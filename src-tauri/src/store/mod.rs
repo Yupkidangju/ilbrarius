@@ -39,6 +39,15 @@ pub async fn is_visited(url: &str) -> anyhow::Result<bool> {
     Ok(page.is_some())
 }
 
+/// 모든 수집된 페이지를 가져옵니다. [v0.1.3]
+pub async fn get_all_pages() -> anyhow::Result<Vec<Page>> {
+    let db = get_db().await?;
+    let mut pages: Vec<Page> = db.select("pages").await?;
+    // Depth와 Timestamp 순으로 정렬
+    pages.sort_by(|a, b| a.depth.cmp(&b.depth).then(a.timestamp.cmp(&b.timestamp)));
+    Ok(pages)
+}
+
 pub async fn init() {
     if let Err(e) = get_db().await {
         eprintln!("Failed to initialize SurrealDB: {}", e);

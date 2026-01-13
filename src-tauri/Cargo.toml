@@ -24,6 +24,7 @@ chromiumoxide = { version = "0.5", features = ["tokio-runtime"] }
 base64 = "0.21"
 futures = "0.3"
 surrealdb = { version = "1.0", features = ["kv-rocksdb"] } 
+chrono = "0.4"
 typst = "0.11.0"
 
 [features]

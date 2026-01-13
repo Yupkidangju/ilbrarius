@@ -1,9 +1,22 @@
 pub mod crawler;
 pub mod printer;
 pub mod store;
+pub mod exporter;
 
 use tauri::Manager;
 use crate::crawler::{normalize_url, start_bfs_crawl};
+use std::path::PathBuf;
+
+#[tauri::command]
+async fn export_pdf(app: tauri::AppHandle) -> Result<String, String> {
+    let path = app.path().download_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let output_path = path.join(format!("Librarius_Archive_{}.pdf", chrono::Local::now().format("%Y%m%d_%H%M%S")));
+    
+    crate::exporter::assemble_pdf(output_path.clone()).await
+        .map_err(|e| e.to_string())?;
+    
+    Ok(output_path.to_string_lossy().to_string())
+}
 
 #[tauri::command]
 async fn start_crawl(app: tauri::AppHandle, url: String, depth: u32) -> Result<(), String> {
@@ -35,7 +48,7 @@ pub fn run() {
             });
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![greet, track_url, start_crawl])
+        .invoke_handler(tauri::generate_handler![greet, track_url, start_crawl, export_pdf])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
