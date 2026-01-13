@@ -1,0 +1,19 @@
+# Logs
+logs/
+target/
+node_modules/
+dist/
+.DS_Store
+
+# User Exception Rules (Allowed Documentation)
+!README.md
+!CHANGELOG.md
+!BUILD_GUIDE.md
+
+# Ignored Documentation (Local Only)
+IMPLEMENTATION_SUMMARY.md
+DESIGN_DECISIONS.md
+LESSONS_LEARNED.md
+audit_roadmap.md
+spec.md
+.traerules
