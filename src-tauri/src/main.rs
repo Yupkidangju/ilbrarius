@@ -3,9 +3,13 @@ pub mod printer;
 pub mod store;
 
 use tauri::Manager;
-use crate::crawler::normalize_url;
+use crate::crawler::{normalize_url, start_bfs_crawl};
 
-// Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
+#[tauri::command]
+async fn start_crawl(url: String, depth: u32) -> Result<(), String> {
+    start_bfs_crawl(url, depth).await.map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 async fn track_url(url: String) -> Result<String, String> {
     match normalize_url(&url).await {
@@ -23,7 +27,15 @@ fn greet(name: &str) -> String {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
-        .invoke_handler(tauri::generate_handler![greet, track_url])
+        .setup(|app| {
+            // 초기화 작업
+            let handle = app.handle().clone();
+            tokio::spawn(async move {
+                crate::store::init().await;
+            });
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![greet, track_url, start_crawl])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
