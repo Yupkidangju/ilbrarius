@@ -6,6 +6,18 @@ use futures::StreamExt;
 use std::collections::VecDeque;
 use crate::store::{save_page, is_visited, Page};
 use std::time::{SystemTime, UNIX_EPOCH};
+use tauri::{AppHandle, Manager, Emitter};
+use base64::{Engine as _, engine::general_purpose};
+use serde::Serialize;
+
+#[derive(Clone, Serialize)]
+pub struct CrawlEvent {
+    pub url: String,
+    pub title: String,
+    pub screenshot: Option<String>, // Base64 encoded
+    pub status: String,
+    pub depth: u32,
+}
 
 /// URL을 정규화하고 최종 리다이렉션 목적지를 반환합니다. [v0.1.0]
 pub async fn normalize_url(input_url: &str) -> Result<String> {
@@ -20,9 +32,9 @@ pub async fn normalize_url(input_url: &str) -> Result<String> {
     Ok(final_url)
 }
 
-/// Recursive BFS Crawler 구현. [v0.1.2]
-/// 사용자가 설정한 Depth까지 하위 링크를 탐색하며 데이터를 수집합니다.
-pub async fn start_bfs_crawl(start_url: String, max_depth: u32) -> Result<()> {
+/// Recursive BFS Crawler 구현. [v0.1.3]
+/// 실시간 화면 캡처 및 상태 이벤트를 프론트엔드로 전송합니다.
+pub async fn start_bfs_crawl(app: AppHandle, start_url: String, max_depth: u32) -> Result<()> {
     let (mut browser, mut handler) = Browser::launch(
         BrowserConfig::builder()
             .no_sandbox()
@@ -30,7 +42,6 @@ pub async fn start_bfs_crawl(start_url: String, max_depth: u32) -> Result<()> {
             .build()?
     ).await?;
 
-    // 브라우저 이벤트 핸들러를 별도 태스크로 실행
     tokio::spawn(async move {
         while let Some(h) = handler.next().await {
             if let Err(e) = h {
@@ -47,27 +58,48 @@ pub async fn start_bfs_crawl(start_url: String, max_depth: u32) -> Result<()> {
         if depth > max_depth { continue; }
         if is_visited(&current_url).await.unwrap_or(false) { continue; }
 
-        log::info!("[v0.1.2] Crawling Depth {}: {}", depth, current_url);
+        // 상태 알림: 탐색 시작
+        let _ = app.emit("crawl-status", CrawlEvent {
+            url: current_url.clone(),
+            title: "".into(),
+            screenshot: None,
+            status: "Loading...".into(),
+            depth,
+        });
 
         let page = browser.new_page(&current_url).await?;
         
-        // 페이지 로딩 대기 및 데이터 추출
+        // 페이지 로딩 대기
+        tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
+
         let title = page.get_title().await?.unwrap_or_default();
         let content = page.get_content().await?;
         
-        // 데이터 즉시 저장 (Checkpoint System)
+        // 화면 캡처 (Live Viewport용)
+        let screenshot_bytes = page.screenshot(chromiumoxide::page::ScreenshotParams::builder().build()).await?;
+        let screenshot_base64 = general_purpose::STANDARD.encode(screenshot_bytes);
+
+        // 상태 알림: 캡처 완료 및 데이터 수집
+        let _ = app.emit("crawl-status", CrawlEvent {
+            url: current_url.clone(),
+            title: title.clone(),
+            screenshot: Some(screenshot_base64),
+            status: "Captured".into(),
+            depth,
+        });
+
+        // 데이터 즉시 저장
         let page_data = Page {
             url: current_url.clone(),
             title,
             content,
             depth,
-            parent_url: None, // 향후 구조 개선 시 추가
+            parent_url: None,
             timestamp: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
         };
         
         save_page(page_data).await?;
 
-        // 하위 링크 추출 (Depth가 남아있는 경우)
         if depth < max_depth {
             let links: Vec<String> = page.evaluate("() => Array.from(document.querySelectorAll('a')).map(a => a.href)")
                 .await?
@@ -84,6 +116,7 @@ pub async fn start_bfs_crawl(start_url: String, max_depth: u32) -> Result<()> {
     }
 
     browser.close().await?;
+    let _ = app.emit("crawl-finished", ());
     Ok(())
 }
 

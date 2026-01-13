@@ -6,8 +6,8 @@ use tauri::Manager;
 use crate::crawler::{normalize_url, start_bfs_crawl};
 
 #[tauri::command]
-async fn start_crawl(url: String, depth: u32) -> Result<(), String> {
-    start_bfs_crawl(url, depth).await.map_err(|e| e.to_string())
+async fn start_crawl(app: tauri::AppHandle, url: String, depth: u32) -> Result<(), String> {
+    crate::crawler::start_bfs_crawl(app, url, depth).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
