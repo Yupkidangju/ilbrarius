@@ -4,7 +4,7 @@
 
 ## [v0.1.0] - 2026-01-13
 ### 추가됨 (Added)
-- 프로젝트 초기화 및 `spec.md` 기반 디렉토리 구조 설계
-- Tauri v2 + React + TypeScript + Rust 스캐폴딩 적용
-- D3D Protocol 준수를 위한 필수 문서 생성 (`README.md`, `BUILD_GUIDE.md` 등)
-- 핵심 라이브러리 의존성 정의 (`chromium-oxide`, `surrealdb`, `tokio`, `typst`)
+- [v0.1.1] URL 리다이렉션 추적 엔진 (`track_url`) 구현
+- `reqwest` 라이브러리 추가 및 비동기 URL 정규화 로직 적용
+- 프론트엔드 `useCrawler` 훅 및 URL 분석 UI 연동
+- 사이드바 레이아웃 (300px 고정) 및 메인 뷰포트 구성
